@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>15-Way RPS 멀티게임</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; text-align: center; background: #f0f2f5; margin-top: 50px; }
+        #game-screen { display: none; }
+        .buttons-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 600px; margin: 20px auto; }
+        button { padding: 12px; font-size: 14px; cursor: pointer; background: #fff; border: 1px solid #ccc; border-radius: 5px; font-weight: bold; }
+        button:hover { background: #007bff; color: white; }
+        #log { margin-top: 20px; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+
+    <h1>🔥 15가지 선택지 가위바위보 멀티게임 🔥</h1>
+
+    <!-- 로비 화면 -->
+    <div id="lobby">
+        <input type="text" id="roomInput" placeholder="방 번호 입력 (예: room1)">
+        <button onclick="joinRoom()">방 입장하기</button>
+    </div>
+
+    <!-- 게임 화면 -->
+    <div id="game-screen">
+        <h2 id="room-title"></h2>
+        <div id="log">방에 연결되었습니다. 대전 상대를 기다리는 중...</div>
+        
+        <h3>원소를 선택하세요!</h3>
+        <div class="buttons-grid" id="element-buttons">
+            <!-- 자바스크립트로 15개 버튼 자동 생성 -->
+        </div>
+    </div>
+
+    <script>
+        const elements = [
+            "Rock", "Gun", "Lightning", "Devil", "Dragon", 
+            "Water", "Air", "Paper", "Sponge", "Wolf", 
+            "Tree", "Human", "Snake", "Scissors", "Fire"
+        ];
+
+        let ws = null;
+
+        function joinRoom() {
+            const roomId = document.getElementById("roomInput").value.trim();
+            if (!roomId) {
+                alert("방 번호를 입력해주세요!");
+                return;
+            }
+
+            document.getElementById("lobby").style.display = "none";
+            document.getElementById("game-screen").style.display = "block";
+            document.getElementById("room-title").innerText = `방 번호: ${roomId}`;
+
+            // 웹소켓 연결
+            ws = new WebSocket(`ws://${window.location.host}/ws/${roomId}`);
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                const logDiv = document.getElementById("log");
+
+                if (data.type === "info") {
+                    logDiv.innerText = data.message;
+                } else if (data.type === "result") {
+                    let resultText = `[결과] 플레이어1: ${data.p1_choice} vs 플레이어2: ${data.p2_choice} -> `;
+                    if (data.winner === "draw") {
+                        resultText += "무승부!";
+                    } else {
+                        resultText += `${data.winner === "player1" ? "플레이어 1" : "플레이어 2"} 승리!`;
+                    }
+                    logDiv.innerText = resultText;
+                } else if (data.type === "error") {
+                    alert(data.message);
+                    location.reload();
+                }
+            };
+
+            // 선택 버튼 생성
+            const grid = document.getElementById("element-buttons");
+            elements.forEach(el => {
+                const btn = document.createElement("button");
+                btn.innerText = el;
+                btn.onclick = () => sendChoice(el);
+                grid.appendChild(btn);
+            });
+        }
+
+        function sendChoice(choice) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "choice", choice: choice }));
+            }
+        }
+    </script>
+</body>
+</html>
